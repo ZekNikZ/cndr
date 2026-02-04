@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm type-check:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm lint:fix:*)",
+      "Bash(pnpm build:all:*)",
+      "Bash(pnpm test:*)",
+      "Bash(tree:*)",
+      "Bash(timeout 3 pnpm dev:*)",
+      "Bash(pnpm dev)"
+    ]
+  }
+}
