@@ -1,10 +1,16 @@
+import 'dotenv/config';
+
+import { createServer } from 'node:http';
+
 import compression from 'compression';
 import cors from 'cors';
-import 'dotenv/config';
-import type { ApiResponse } from '@cndr/shared';
-import express, { type Request, type Response, type NextFunction } from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { pino } from 'pino';
+import { Server } from 'socket.io';
+
+import type { ClientToServerEvents, ServerToClientEvents } from '@cndr/shared';
+
 import { env } from './config/env.js';
 
 const logger = pino({
@@ -21,6 +27,13 @@ const logger = pino({
 });
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+  cors: {
+    origin: '*', // adjust for security in production
+    methods: ['GET', 'POST'],
+  },
+});
 
 // Middleware
 app.use(helmet());
@@ -44,7 +57,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
-  const response: ApiResponse<{ status: string; timestamp: string }> = {
+  const response = {
     success: true,
     data: {
       status: 'ok',
@@ -54,30 +67,28 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json(response);
 });
 
-// Example user endpoint
-app.get('/users/:id', (req: Request, res: Response) => {
-  const id = req.params.id;
-  const userId = Array.isArray(id) ? (id[0] ?? 'unknown') : (id ?? 'unknown');
+// ws
+io.on('connection', (socket) => {
+  console.log('a user connected');
 
-  const response: ApiResponse<{
-    id: string;
-    name: string;
-    email: string;
-  }> = {
-    success: true,
-    data: {
-      id: userId,
-      name: 'Example User',
-      email: 'user@example.com',
-    },
-  };
+  socket.on('handshake', (roomCode, role, roomPassword, hostKey) => {
+    console.log(`handshake received for room ${roomCode}`);
 
-  res.json(response);
+    if (role === 'host') {
+      if (!hostKey) {
+        socket.emit('handshake', 'error', 'Host key is required for host role');
+      } else {
+        socket.emit('handshake', 'success');
+      }
+    } else {
+      socket.emit('handshake', 'success');
+    }
+  });
 });
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
-  const response: ApiResponse<never> = {
+  const response = {
     success: false,
     error: 'Not Found',
   };
@@ -91,7 +102,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     stack: err.stack,
   });
 
-  const response: ApiResponse<never> = {
+  const response = {
     success: false,
     error: env.NODE_ENV === 'development' ? err.message : 'Internal Server Error',
   };
@@ -100,7 +111,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 // Start server
-app.listen(env.PORT, env.HOST, () => {
+httpServer.listen(env.PORT, env.HOST, () => {
   logger.info(`Server running at http://${env.HOST}:${env.PORT}`);
   logger.info(`Environment: ${env.NODE_ENV}`);
 });

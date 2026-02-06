@@ -22,7 +22,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@cndr/shared": "workspace:*"
+    "@cndr/shared": "workspace:*",
+    "socket.io-client": "4.8.3",
+    "ulid": "3.0.2"
   },
   "devDependencies": {
     "@types/node": "22.10.6",
